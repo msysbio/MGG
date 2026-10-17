@@ -34,7 +34,7 @@ public class CheckMetaDataFileTask extends AbstractTask {
 	        if (metaDataObject != null && metaDataObject.containsKey("metadata")) {
 	                SwingUtilities.invokeLater(() -> {
 	                    JSONDisplayPanel panel = new JSONDisplayPanel(mggManager, metaDataObject);
-	                    displayPanelInFrame(panel, "Imported MetaData");
+	                    displayPanelInFrame(panel, "Imported Metadata");
 	                });
 	            } else {
 		              	

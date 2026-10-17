@@ -174,8 +174,10 @@ public class ImportFileTask extends AbstractTask {
                   
             taskMonitor.setProgress(1.0);
             taskMonitor.setStatusMessage("Abudance data imported successfully.");
+            // A network imported before is loaded now, if its nodes are all known
+            final String abundanceMessage = "Abundance data loaded correctly" + mggManager.pendingNetworkNote();
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, 
-    	            "Abudance data loaded correctly", "Information", JOptionPane.INFORMATION_MESSAGE));
+    	            abundanceMessage, "Information", JOptionPane.INFORMATION_MESSAGE));
                                    
             
             

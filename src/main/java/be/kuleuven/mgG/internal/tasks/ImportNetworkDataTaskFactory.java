@@ -22,8 +22,9 @@ public class ImportNetworkDataTaskFactory implements TaskFactory {
 	@Override
 	public boolean isReady() {
 		
-		JSONObject dataJsonObject = mggManager.getJsonObject();
-        return dataJsonObject != null;
+		// In any order: a network imported before its taxonomies (abundance table or taxonomy file) or metadata
+		// is kept until they are imported
+		return mggManager.getService(org.cytoscape.application.CyApplicationManager.class).getCurrentNetwork() != null;
 	}
 
 }

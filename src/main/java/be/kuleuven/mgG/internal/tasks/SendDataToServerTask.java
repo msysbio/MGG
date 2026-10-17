@@ -11,6 +11,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
+import java.util.prefs.Preferences;
 import org.cytoscape.work.AbstractTask;
 
 import org.cytoscape.work.TaskMonitor;
@@ -31,6 +32,14 @@ import be.kuleuven.mgG.internal.utils.LogUtils;
 
 
 public class SendDataToServerTask extends AbstractTask {
+
+	// The public microbetag server, and the route that annotates the data sent
+	public static final String PUBLIC_SERVER = "https://msysbio.gbiomed.kuleuven.be";
+	private static final String ANNOTATE_ROUTE = "/upload-abundance-table-dev";
+
+	// The last server used is remembered across Cytoscape sessions
+	private static final Preferences PREFS = Preferences.userNodeForPackage(SendDataToServerTask.class);
+	private static final String SERVER_PREF = "microbetagServer";
  	
 	private  String serverResponse; // Stores the server response
 	private final JSONObject dataObject; // The JSON array to send to the server
@@ -39,6 +48,7 @@ public class SendDataToServerTask extends AbstractTask {
     private final MGGManager mggManager;  // The MGGManager instance for retrieving the JSON array
         
  	// @Tunables part -- Parameters/Arguments      
+
     
      @Tunable(
     		 description="Choose input type", 
@@ -158,8 +168,11 @@ public class SendDataToServerTask extends AbstractTask {
     	this.metaDataObject = mggManager.getMetadataJsonObject();
     	this.networkObject  = mggManager.getNetworkObject();
 
-        // Dynamically determine INPUT options based on whether networkObject is empty
-        if (networkObject != null && !networkObject.isEmpty()) {
+        // Dynamically determine INPUT options based on whether networkObject is empty;
+        // a server other than the public one needs a network
+        if (!isPublicServer()) {
+            this.INPUT = new ListSingleSelection<>("network");
+        } else if (networkObject != null && !networkObject.isEmpty()) {
             this.INPUT = new ListSingleSelection<>("abundance table", "network");
         } else {
             this.INPUT = new ListSingleSelection<>("abundance table");
@@ -168,6 +181,42 @@ public class SendDataToServerTask extends AbstractTask {
     
     }
     
+    /**
+     * Whether the public server is set. Another server, e.g. one of your own genomes, does not infer networks:
+     * it needs a network (its metadata mark the network's nodes of metadata variables).
+     */
+    public static boolean isPublicServer() {
+        return annotateURL(getServer()).equals(annotateURL(PUBLIC_SERVER));
+    }
+
+    /** The microbetag server set with Apps > MGG > Set microbetag server; our public server by default. */
+    public static String getServer() {
+        return PREFS.get(SERVER_PREF, PUBLIC_SERVER);
+    }
+
+    public static void setServer(String server) {
+        PREFS.put(SERVER_PREF, (server == null || server.trim().isEmpty()) ? PUBLIC_SERVER : server.trim());
+    }
+
+    /**
+     * The URL to send the data to: a server's address, e.g. http://localhost:5000, gets the annotation route;
+     * a full URL, with a path, is used as it is.
+     */
+    static String annotateURL(String server) {
+        String url = (server == null || server.trim().isEmpty()) ? PUBLIC_SERVER : server.trim();
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://" + url;
+        }
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        // No path after the host: add the route
+        if (url.indexOf('/', url.indexOf("//") + 2) < 0) {
+            url += ANNOTATE_ROUTE;
+        }
+        return url;
+    }
+
     /**
      * Runs the task to send data to the server.
      *
@@ -182,13 +231,17 @@ public class SendDataToServerTask extends AbstractTask {
     	// Create a new JSONObject
         JSONObject jsonObject = new JSONObject();
         
-        // Add the 'data' JSONArray from dataObject
-        if (dataObject != null && dataObject.containsKey("data")) {
-            JSONArray dataJsonArray = (JSONArray) dataObject.get("data");
-            jsonObject.put("abundance_data", dataJsonArray);
+        // The abundance table, or, for a network without one, the taxonomy of its nodes (node names and
+        // taxonomies, without samples)
+        JSONArray abundanceData = mggManager.abundanceOrTaxonomy();
+        boolean taxonomyOnly = !(dataObject != null && dataObject.containsKey("data"));
+        if (abundanceData != null) {
+            jsonObject.put("abundance_data", abundanceData);
         }
 
         // Add the 'metadata' JSONArray from metaDataObject
+        // With any server: for network inference (public server), and to mark the nodes of metadata variables
+        // in the network given
         if (metaDataObject != null && metaDataObject.containsKey("metadata")) {
             JSONArray metaDataJsonArray = (JSONArray) metaDataObject.get("metadata");
             jsonObject.put("metadata", metaDataJsonArray);
@@ -204,7 +257,8 @@ public class SendDataToServerTask extends AbstractTask {
 	       JSONArray inputParameters = new JSONArray();
 	        
 	 
-	        inputParameters.add("input_type:" + INPUT.getSelectedValue());
+	        // Without an abundance table, the network is the input: there are no samples to infer one from
+	        inputParameters.add("input_type:" + (taxonomyOnly ? "network" : INPUT.getSelectedValue()));
 	        inputParameters.add("taxonomy:" + TAXONOMY.getSelectedValue());
 	        inputParameters.add("delimiter:" + DELIMITER.getSelectedValue()); 
 	        inputParameters.add("sensitive:" + SENSITIVE);
@@ -241,10 +295,9 @@ public class SendDataToServerTask extends AbstractTask {
 
         try {
                 String jsonQuery = jsonObject.toJSONString();
-//                String serverURL = "https://msysbio.gbiomed.kuleuven.be/upload-abundance-table-dev";
-                String serverURL = "http://localhost:1337/upload-abundance-table-dev";
-//                String serverURL = "http://localhost:1337/test-cx2";
-//                String serverURL = "http://localhost:1337/toy-cx2";
+                // Set with Apps > MGG > Set microbetag server
+                String serverURL = annotateURL(getServer());
+                taskMonitor.setStatusMessage("Sending your data to " + serverURL);
 
                 HttpPost httpPost = new HttpPost(serverURL);
                 httpPost.setConfig(config);
@@ -279,6 +332,8 @@ public class SendDataToServerTask extends AbstractTask {
 						 mggManager.setJsonObject(null);
 						 mggManager.setMetadataJsonObject(null);
 						 mggManager.setNetworkObject(null);
+						 mggManager.setTaxonomyJsonObject(null);
+						 mggManager.setPendingNetworkObject(null);
                         }                        
                       	  
                    } catch (Exception e) {
@@ -294,6 +349,8 @@ public class SendDataToServerTask extends AbstractTask {
 		                 	 mggManager.setJsonObject(null);
 		                 	 mggManager.setMetadataJsonObject(null);
 		                 	 mggManager.setNetworkObject(null);
+		                 	 mggManager.setTaxonomyJsonObject(null);
+		                 	 mggManager.setPendingNetworkObject(null);
 		                 }
                 	 }
                                                               

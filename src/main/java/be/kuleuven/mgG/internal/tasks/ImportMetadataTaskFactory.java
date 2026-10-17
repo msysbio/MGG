@@ -49,8 +49,8 @@ public class ImportMetadataTaskFactory implements TaskFactory {
 	    @Override
 	    public boolean isReady() {
 	    	
-	    	JSONObject dataJsonObject = mggManager.getJsonObject();
-	        return dataJsonObject != null;
+	    	// In any order: before or after the abundance table, the taxonomy file or the network
+	        return true;
 	   
 	    }
 	}

@@ -21,12 +21,14 @@ import org.cytoscape.work.TaskFactory;
 import org.cytoscape.service.util.AbstractCyActivator;
 
 import be.kuleuven.mgG.internal.tasks.AboutTaskFactory;
+import be.kuleuven.mgG.internal.tasks.SetServerTaskFactory;
 import be.kuleuven.mgG.internal.tasks.CheckAbudanceFileTaskFactory;
 import be.kuleuven.mgG.internal.tasks.CheckMetaDataFileTaskFactory;
 import be.kuleuven.mgG.internal.tasks.CheckNetworkTaskFactory;
 import be.kuleuven.mgG.internal.tasks.CreateMGGVisualStyleTaskFactory;
 import be.kuleuven.mgG.internal.tasks.ImportFileTaskFactory;
 import be.kuleuven.mgG.internal.tasks.ImportMetadataTaskFactory;
+import be.kuleuven.mgG.internal.tasks.ImportTaxonomyTaskFactory;
 import be.kuleuven.mgG.internal.tasks.ImportNetworkDataTaskFactory;
 import be.kuleuven.mgG.internal.tasks.SendDataToServerTaskFactory;
 import be.kuleuven.mgG.internal.tasks.ShowResultsPanelAction;
@@ -125,9 +127,22 @@ public class CyActivator extends AbstractCyActivator {
 
         registerService(bc, mggImportFileTaskFactory, TaskFactory.class, props);
 
+        ImportTaxonomyTaskFactory mggImportTaxonomyTaskFactory = new ImportTaxonomyTaskFactory(MGGManager);
+        Properties taxonomyprops = new Properties();
+        taxonomyprops.setProperty(TITLE, "Import Taxonomy");
+        taxonomyprops.setProperty(PREFERRED_MENU, "Apps.MGG.Import Data");
+        taxonomyprops.setProperty(IN_TOOL_BAR, "FALSE");
+        taxonomyprops.setProperty(IN_MENU_BAR, "TRUE");
+        taxonomyprops.setProperty(MENU_GRAVITY, "2.5");
+        taxonomyprops.setProperty(COMMAND_NAMESPACE, "MGG");
+        taxonomyprops.setProperty(COMMAND_DESCRIPTION, "Load the taxonomies of the nodes of a network (node, taxonomy)");
+        taxonomyprops.setProperty(COMMAND, "Load_Taxonomy");
+
+        registerService(bc, mggImportTaxonomyTaskFactory, TaskFactory.class, taxonomyprops);
+
         ImportMetadataTaskFactory mggImportMetaDataTaskFactory = new ImportMetadataTaskFactory(MGGManager);
         Properties metadataprops = new Properties();
-        metadataprops.setProperty(TITLE, "Import MetaData");
+        metadataprops.setProperty(TITLE, "Import Metadata");
         metadataprops.setProperty(PREFERRED_MENU, "Apps.MGG.Import Data");
         metadataprops.setProperty(IN_TOOL_BAR, "FALSE");
         metadataprops.setProperty(IN_MENU_BAR, "TRUE");
@@ -169,7 +184,7 @@ public class CyActivator extends AbstractCyActivator {
         
         CheckMetaDataFileTaskFactory mggCheckMetaDataFileTaskFactory = new CheckMetaDataFileTaskFactory(MGGManager);
         Properties checkMetaDataprops = new Properties();
-        checkMetaDataprops.setProperty(TITLE, "Check  MetaData");
+        checkMetaDataprops.setProperty(TITLE, "Check Metadata");
         checkMetaDataprops.setProperty(PREFERRED_MENU, "Apps.MGG.Import Data.Check Data Files");
         checkMetaDataprops.setProperty(IN_TOOL_BAR, "FALSE");
         checkMetaDataprops.setProperty(IN_MENU_BAR, "TRUE");
@@ -226,6 +241,21 @@ public class CyActivator extends AbstractCyActivator {
 
         registerService(bc, sendDataToServerTaskFactory, TaskFactory.class, Sendprops);
 
+
+
+        // The microbetag server to send the data to: the public one, or your own
+        SetServerTaskFactory setServerTaskFactory = new SetServerTaskFactory();
+        Properties serverprops = new Properties();
+        serverprops.setProperty(TITLE, "Set microbetag server");
+        serverprops.setProperty(PREFERRED_MENU, "Apps.MGG");
+        serverprops.setProperty(IN_TOOL_BAR, "FALSE");
+        serverprops.setProperty(IN_MENU_BAR, "TRUE");
+        serverprops.setProperty(MENU_GRAVITY, "9");
+        serverprops.setProperty(COMMAND_NAMESPACE, "MGG");
+        serverprops.setProperty(COMMAND_DESCRIPTION, "Set the microbetag server to send the data to");
+        serverprops.setProperty(COMMAND, "Set_Server");
+
+        registerService(bc, setServerTaskFactory, TaskFactory.class, serverprops);
 
 
         AboutTaskFactory mggAboutTaskFactory = new AboutTaskFactory ();

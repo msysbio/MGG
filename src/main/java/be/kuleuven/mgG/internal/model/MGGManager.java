@@ -212,6 +212,141 @@ public class MGGManager implements SessionAboutToBeSavedListener, SessionLoadedL
     public JSONObject getNetworkObject() {
     	return networkObject;
     }
+
+    // The taxonomy of each node of a network, when there is no abundance table (Import Taxonomy):
+    // {"taxonomy": [["seqId", "taxonomy"], [node, taxonomy], ...]}
+    private JSONObject taxonomyObject;
+
+    public JSONObject getTaxonomyJsonObject() {
+        return taxonomyObject;
+    }
+
+    public void setTaxonomyJsonObject(JSONObject jsonObject) {
+        this.taxonomyObject = jsonObject;
+    }
+
+    /**
+     * What is sent to the server as the abundance data: the abundance table, or, without one, the taxonomy of
+     * each node (a table of node names and taxonomies, without samples). Null if neither is imported.
+     */
+    public JSONArray abundanceOrTaxonomy() {
+        if (jsonObject != null && jsonObject.containsKey("data")) {
+            return (JSONArray) jsonObject.get("data");
+        }
+        if (taxonomyObject != null && taxonomyObject.containsKey("taxonomy")) {
+            return (JSONArray) taxonomyObject.get("taxonomy");
+        }
+        return null;
+    }
+
+    /** Whether the taxa of a network are known: an abundance table or a taxonomy file is imported. */
+    public boolean hasTaxa() {
+        return abundanceOrTaxonomy() != null;
+    }
+
+    /**
+     * After an import: loads the network imported before if its nodes are now all known, and says so; or says
+     * what its nodes still miss. Empty if there is no pending network.
+     */
+    public String pendingNetworkNote() {
+        if (pendingNetworkObject == null) {
+            return "";
+        }
+        if (acceptPendingNetwork()) {
+            return "\nThe network imported before is now loaded too: all its nodes are known.";
+        }
+        java.util.List<String> unknown = unknownNetworkNodes(pendingNetworkObject);
+        return "\nThe network imported before still has " + unknown.size() + " node(s) without a taxonomy that are "
+            + "not metadata variables either, e.g. " + String.join(", ", unknown.subList(0, Math.min(5, unknown.size())))
+            + ".\n" + whatNodesNeed();
+    }
+
+    /** What the nodes of a network need, for the messages of the imports. */
+    public static String whatNodesNeed() {
+        return "Each node of the network needs a taxonomy, from an abundance table (Import Abundance Data) or a file "
+            + "of node names and their taxonomies (Import Taxonomy), unless it is a metadata variable (Import Metadata).";
+    }
+
+    // A network whose nodes are not all known yet: kept until their taxonomies or the metadata are imported
+    private JSONObject pendingNetworkObject;
+
+    public JSONObject getPendingNetworkObject() {
+        return pendingNetworkObject;
+    }
+
+    public void setPendingNetworkObject(JSONObject jsonObject) {
+        this.pendingNetworkObject = jsonObject;
+    }
+
+    /**
+     * The nodes of a network that are neither sequences of the abundance table (or nodes of the taxonomy file)
+     * nor metadata variables.
+     * A node of a metadata variable is named after it (e.g. ENV1, or ENV4_A for a value of a categorical
+     * variable): its name starts with the name of a variable of the imported metadata (the first cell of each
+     * of its rows), as the microbetag server tells them apart.
+     */
+    public java.util.List<String> unknownNetworkNodes(JSONObject networkJsonObject) {
+        java.util.Set<String> nodeNamesInNetwork = new java.util.HashSet<>();
+        org.json.simple.JSONArray networkData = (org.json.simple.JSONArray) networkJsonObject.get("network");
+        for (int i = 1; i < networkData.size(); i++) {
+            org.json.simple.JSONArray edge = (org.json.simple.JSONArray) networkData.get(i);
+            nodeNamesInNetwork.add((String) edge.get(0));
+            nodeNamesInNetwork.add((String) edge.get(1));
+        }
+
+        // Sequences of the abundance table, or nodes of the taxonomy file
+        java.util.Set<String> nodeNamesInData = new java.util.HashSet<>();
+        org.json.simple.JSONArray data = abundanceOrTaxonomy();
+        if (data != null) {
+            for (int i = 1; i < data.size(); i++) {
+                nodeNamesInData.add((String) ((org.json.simple.JSONArray) data.get(i)).get(0));
+            }
+        }
+
+        java.util.List<String> metavars = new java.util.ArrayList<>();
+        JSONObject metadataJsonObject = getMetadataJsonObject();
+        if (metadataJsonObject != null && metadataJsonObject.containsKey("metadata")) {
+            for (Object row : (org.json.simple.JSONArray) metadataJsonObject.get("metadata")) {
+                org.json.simple.JSONArray cells = (org.json.simple.JSONArray) row;
+                if (!cells.isEmpty() && cells.get(0) != null && !cells.get(0).toString().trim().isEmpty()) {
+                    metavars.add(cells.get(0).toString().trim());
+                }
+            }
+        }
+
+        java.util.List<String> unknown = new java.util.ArrayList<>();
+        for (String node : nodeNamesInNetwork) {
+            if (nodeNamesInData.contains(node)) {
+                continue;
+            }
+            boolean isMetavar = false;
+            for (String metavar : metavars) {
+                if (node.startsWith(metavar)) {
+                    isMetavar = true;
+                    break;
+                }
+            }
+            if (!isMetavar) {
+                unknown.add(node);
+            }
+        }
+        java.util.Collections.sort(unknown);
+        return unknown;
+    }
+
+    /**
+     * Accepts the pending network if its nodes are now all known (once their taxonomies or the metadata are
+     * imported).
+     * Returns true if it was accepted.
+     */
+    public boolean acceptPendingNetwork() {
+        if (pendingNetworkObject != null && unknownNetworkNodes(pendingNetworkObject).isEmpty()) {
+            setNetworkObject(pendingNetworkObject);
+            pendingNetworkObject = null;
+            return true;
+        }
+        return false;
+    }
     
     
     /**

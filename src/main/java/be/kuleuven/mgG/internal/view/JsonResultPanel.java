@@ -76,7 +76,15 @@ public class JsonResultPanel extends JPanel implements CytoPanelComponent {
         sendButton.addActionListener(new ActionListener() {  
             public void actionPerformed(ActionEvent e) {
               
-            	 TaskIterator taskIterator = new SendDataToServerTaskFactory( manager).createTaskIterator();
+            	 SendDataToServerTaskFactory sendFactory = new SendDataToServerTaskFactory(manager);
+            	 if (!sendFactory.isReady()) {
+            		 javax.swing.JOptionPane.showMessageDialog(JsonResultPanel.this,
+            				 "The microbetag server set (Apps > MGG > Set microbetag server) needs your network too:\n"
+            				 + "import it with Apps > MGG > Import Data > Import Current Network.",
+            				 "MGG", javax.swing.JOptionPane.WARNING_MESSAGE);
+            		 return;
+            	 }
+            	 TaskIterator taskIterator = sendFactory.createTaskIterator();
                  manager.executeTasks(taskIterator);
                  
                  //added this to start the factory for showResultsPaneltaskFactory

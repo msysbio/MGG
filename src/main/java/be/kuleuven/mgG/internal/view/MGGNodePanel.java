@@ -420,6 +420,9 @@ public class MGGNodePanel extends AbstractMggPanel {
     	                for (Object genome : (List<?>) genomeGroupObj) genomeGroups.add(genome.toString());
     	            }
 
+    	            // Genomes that are not GTDB accessions are of a server's own catalogue: listed apart, without a GTDB link
+    	            List<String> localGenomes = new ArrayList<>();
+
     	            // Parse through the NCBI data     	            
     	            for (int i = 0; i < taxIds.size(); i++) {
 
@@ -435,7 +438,7 @@ public class MGGNodePanel extends AbstractMggPanel {
     	                idLabel.setFont(new Font("SansSerif", Font.PLAIN, 10));
     	                subPanel.add(idLabel);
 
-    	                if (!taxId.equals("<NA>")) {
+    	                if (!isMissing(taxId)) {
     	                    String url = "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=" + taxId;
     	                    SwingLink link = new SwingLink(taxId, url, openBrowser);
     	                    subPanel.add(link);
@@ -450,10 +453,12 @@ public class MGGNodePanel extends AbstractMggPanel {
     	                subPanel.add(levelLabel);
 
     	                if (!genomesRaw.equals("")) {
-    	                    String[] genomeIds = genomesRaw.split(",");
+    	                    String[] genomeIds = genomesRaw.split("[,;]");
     	                    for (String genomeId : genomeIds) {
     	                        genomeId = genomeId.trim();
-    	                        if (!genomeId.isEmpty() && !genomeId.equals("NA")) {
+    	                        if (!isMissing(genomeId) && !isGtdbAccession(genomeId)) {
+    	                            if (!localGenomes.contains(genomeId)) localGenomes.add(genomeId);
+    	                        } else if (!isMissing(genomeId)) {
     	                            String genomeUrl = "https://gtdb.ecogenomic.org/genome?gid=" + genomeId;
     	                            SwingLink genomeLink = new SwingLink(genomeId, genomeUrl, openBrowser);
     	                            subPanel.add(genomeLink);
@@ -463,6 +468,18 @@ public class MGGNodePanel extends AbstractMggPanel {
 
     	                gbc.gridwidth = GridBagConstraints.REMAINDER;
     	                panel.add(subPanel, gbc);
+    	                gbc.gridy++;
+    	                gbc.gridwidth = 1;
+    	            }
+
+    	            if (!localGenomes.isEmpty()) {
+    	                JPanel genomesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+    	                genomesPanel.setOpaque(false);
+    	                JLabel genomesLabel = new JLabel("Genomes: " + String.join(", ", localGenomes));
+    	                genomesLabel.setFont(new Font("SansSerif", Font.PLAIN, 10));
+    	                genomesPanel.add(genomesLabel);
+    	                gbc.gridwidth = GridBagConstraints.REMAINDER;
+    	                panel.add(genomesPanel, gbc);
     	                gbc.gridy++;
     	                gbc.gridwidth = 1;
     	            }
@@ -1140,4 +1157,13 @@ public class MGGNodePanel extends AbstractMggPanel {
 		return "<";
 	}
 	
+
+    /** A GTDB genome accession, e.g. GCA_000005845.2 or RS_GCF_000005845.2 */
+    private static boolean isGtdbAccession(String genomeId) {
+        return genomeId.matches("((RS|GB)_)?GC[AF]_\\d+(\\.\\d+)?");
+    }
+
+    private static boolean isMissing(String value) {
+        return value == null || value.isEmpty() || value.equals("<NA>") || value.equals("NA") || value.equals("-");
+    }
 }

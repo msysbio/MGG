@@ -76,8 +76,11 @@ public class ImportMetadataTask extends AbstractTask{
 	            
 	            taskMonitor.setStatusMessage("Metadata file imported successfully.");
 	            taskMonitor.setProgress(1.0);
+
+	            // A network imported before, with nodes of metadata variables, is loaded now
+	            final String metadataMessage = "Metadata file loaded correctly" + mggManager.pendingNetworkNote();
 	            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, 
-	    	            "Metadata file loaded correctly", "Information", JOptionPane.INFORMATION_MESSAGE));
+	    	            metadataMessage, "Information", JOptionPane.INFORMATION_MESSAGE));
 
 	           
 	            
@@ -93,7 +96,7 @@ public class ImportMetadataTask extends AbstractTask{
 	    private void showDataInPanel(JSONObject jsonObject) {
 		    JSONDisplayPanel panel = new JSONDisplayPanel(mggManager, jsonObject);
 		 	
-			 JFrame frame = new JFrame("Imported MetaData");
+			 JFrame frame = new JFrame("Imported Metadata");
 			 frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			 frame.getContentPane().add(panel); frame.pack(); frame.setVisible(true);
 			 

@@ -3,6 +3,8 @@ package be.kuleuven.mgG.internal.tasks;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Collections;
+import java.util.ArrayList;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -124,63 +126,45 @@ public class ImportNetworkData extends AbstractTask {
 	    JSONObject datajsonObject=new JSONObject();
 	    datajsonObject=mggManager.getJsonObject();
 	    
-	    if (hasWeights && areNodesInDataJson(networkJsonObject,  datajsonObject)) {
-	       //  If all are present
+	    if (!hasWeights) {
+	        mggManager.setNetworkObject(null);
+	        mggManager.setPendingNetworkObject(null);
+	        return;
+	    }
+
+	    java.util.List<String> unknown = mggManager.unknownNetworkNodes(networkJsonObject);
+	    if (unknown.isEmpty()) {
+	        //  If all are present
 	        mggManager.setNetworkObject(networkJsonObject);
+	        mggManager.setPendingNetworkObject(null);
 	        taskMonitor.setTitle("Uploading Network");
 	        taskMonitor.showMessage(TaskMonitor.Level.INFO ,"Network data loaded correctly");
-	        
-	    
+
 	        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, 
 	            "Network data loaded correctly", "Information", JOptionPane.INFORMATION_MESSAGE));
-	  
-	      // taskMonitor.showMessage(TaskMonitor.Level.INFO ,"Network Object" +networkJsonObject.toString());
-	      // taskMonitor.showMessage(TaskMonitor.Level.INFO ,"Data object" +datajsonObject.toString());
-	    
+
 	    } else {
-    
-    	// If not all  are present
-	     mggManager.setNetworkObject(null);
-	      taskMonitor.showMessage(TaskMonitor.Level.ERROR, 
-	        "Node ids of the network are not present with sequence identifiers of "
-	        + " abudance table -> network data can't be imported");
-	      
-	     // SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, 
-	          //    "Node ids of the network are not present with sequence identifiers of " +
-	           //   "the abundance table -> network data can't be imported", "Error", JOptionPane.ERROR_MESSAGE));
-	      
-	    }	   
+
+	        // Nodes without a taxonomy yet: the network is kept until their taxonomies (abundance table or
+	        // taxonomy file) or the metadata (for nodes of metadata variables) are imported
+	        // (MGGManager.acceptPendingNetwork)
+	        mggManager.setNetworkObject(null);
+	        mggManager.setPendingNetworkObject(networkJsonObject);
+	        String message = (mggManager.hasTaxa() || mggManager.getMetadataJsonObject() != null
+	                ? unknown.size() + " node(s) of the network have no taxonomy and are not metadata variables, e.g. "
+	                    + String.join(", ", unknown.subList(0, Math.min(5, unknown.size()))) + ".\n"
+	                : "The network is kept: import the taxonomies of its nodes.\n")
+	            + MGGManager.whatNodesNeed() + "\nThe network is loaded once they are all known.";
+	        taskMonitor.showMessage(TaskMonitor.Level.WARN, message.replace("\n", " "));
+	        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null,
+	            message, "Network not loaded yet", JOptionPane.WARNING_MESSAGE));
+	    }
 	}
 	
 		
 
 		
-	private boolean areNodesInDataJson(JSONObject networkJsonObject, JSONObject dataJsonObject) {
-		// This function checks whether the node names of the loaded network, belong to the abundance table already loaded.
-		// If not, then the network will not be loaded successfully, since microbetag would fail.
-		
-		 JSONArray networkData = (JSONArray) networkJsonObject.get("network");
-		    Set<String> nodeNamesInNetwork = new HashSet<>();
-		    for (int i = 1; i < networkData.size(); i++) { 
-		        JSONArray edge = (JSONArray) networkData.get(i);
-		        nodeNamesInNetwork.add((String) edge.get(0)); 
-		        nodeNamesInNetwork.add((String) edge.get(1)); 
-		    }
 
-		    Set<String> nodeNamesInData = new HashSet<>();
-		  
-		    if (dataJsonObject.containsKey("data")) {
-		        JSONArray data = (JSONArray) dataJsonObject.get("data");
-		        
-		        for (int i = 1; i < data.size(); i++) {
-		            JSONArray row = (JSONArray) data.get(i);
-		            
-		            String nodeName = (String) row.get(0); 
-		            nodeNamesInData.add(nodeName);
-		        }
-		    }		   
-		    return nodeNamesInData.containsAll(nodeNamesInNetwork);
-		}
   
 	}
 	    
